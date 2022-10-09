@@ -21,10 +21,11 @@ void serve(int client_socket) {
     while(1) {
         memset(buffer, 0, sizeof(buffer));
         if(recv(client_socket, buffer, sizeof(buffer), 0)<=0) {
+            l.log(1, "from client:"+std::to_string(client_socket), "receive failed");
             break;
         } 
-
         l.log(0, "from client:"+std::to_string(client_socket), "received:"+std::string(buffer));
+
         write(client_socket, buffer, sizeof(buffer));
         l.log(0, "to client:"+std::to_string(client_socket), "wrote:"+std::string(buffer));
     }
@@ -45,9 +46,18 @@ int main() {
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
     server_address.sin_port = htons(PORT);
-    bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address));
+    if ( bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) != 0 ) {
+        l.log(1, "server\t", "bind failed");
+        close(server_socket);
+        return -1;
+    }
+    l.log(0, "server\t", "binding socket:"+std::to_string(server_socket));
 
-    listen(server_socket, SOMAXCONN);
+    if ( listen(server_socket, SOMAXCONN) != 0 ) {
+        l.log(1, "server\t", "listen failed");
+        close(server_socket);
+        return -1;
+    }
     l.log(0, "server\t", "listening port:"+std::to_string(PORT));
 
     struct sockaddr_in client_address;
@@ -56,11 +66,12 @@ int main() {
 
     while(serving) {
         client_socket = accept(server_socket,(struct sockaddr *)&client_address,(socklen_t*)&socklen);
-        l.log(0, "client:"+std::to_string(client_socket), "accepted");
+        l.log(0, "client:"+std::to_string(client_socket), "accepted address:"+std::string(inet_ntoa(client_address.sin_addr)));
         std::thread(serve, client_socket).detach();
     }
 
     close(server_socket);
     l.log(0, "server\t", "closed");
+
     return 0;
 }
